@@ -25,13 +25,16 @@ class DashboardController extends Controller
 
         $ruptureProducts =Product::where('stock','<=',1)->get();
 
+        $lowStockProducts = Product::where('stock','<=',5)->get();
+
         return view('dashboard', compact(
             'products',
             'clients',
             'salesToday',
             'monthlySales',
             'outOfStock',
-            'ruptureProducts'
+            'ruptureProducts',
+            'lowStockProducts'
         ));
     }
 }

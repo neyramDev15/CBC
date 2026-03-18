@@ -87,7 +87,7 @@
 <body>
 
     <div class="sidebar">
-        <h5>🖥 PC STORE</h5>
+        <h5>🖥 CBC</h5>
 
         <a href="{{ route('dashboard') }}">Tableau de Bord</a>
         <a href="{{ route('categories.index') }}">Catégories</a>
@@ -96,6 +96,13 @@
         <a href="{{ route('sales.index') }}">Ventes</a>
         <a href="#">Rapports</a>
         <a href="#">Paramètre</a>
+        <form method="POST" action="{{ route('logout') }}">
+            @csrf
+
+            <button type="submit" class="btn btn-danger w-80 mt-3">
+                Déconnexion
+            </button>
+        </form>
     </div>
 
     <div class="content">
