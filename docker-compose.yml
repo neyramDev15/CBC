@@ -1,0 +1,38 @@
+services:
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cbc_app
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      - postgres
+    environment:
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: db_cbc
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${DB_PASSWORD}
+
+
+  postgres:
+    image: postgres:16
+    container_name: cbc_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: db_cbc
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - cbc_pgdata:/var/lib/postgresql/data
+
+
+volumes:
+  cbc_pgdata:

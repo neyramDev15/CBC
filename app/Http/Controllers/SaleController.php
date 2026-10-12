@@ -8,6 +8,8 @@ use App\Models\Client;
 use App\Models\Product;
 use App\Models\SaleItem;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class SaleController extends Controller
 {
@@ -47,6 +49,8 @@ class SaleController extends Controller
      * 
      * Store a newly created resource in storage.
      */
+
+
     public function store(Request $request)
     {
         $request->validate([
@@ -54,48 +58,52 @@ class SaleController extends Controller
             'payement_method' => 'required|string'
         ]);
 
-        $products = json_decode($request->products, true);
+        $items = json_decode($request->products, true) ?? [];
 
-        $sale = Sale::create([
-            'client_id' => $request->client_id,
-            'total' => 0,
-            'payement_method' => $request->payement_method
-        ]);
+        // Vérification du stock avant toute écriture
+        $lines = [];
+        foreach ($items as $item) {
+            $product = Product::findOrFail($item['id']);
+            $quantity = (int) $item['quantity'];
 
-        $total = 0;
-
-        foreach ($products as $item) {
-
-            $subtotal = $item['price'] * $item['quantity'];
-            $total += $subtotal;
-
-            SaleItem::create([
-                'sale_id' => $sale->id,
-                'product_id' => $item['id'],
-                'quantity' => $item['quantity'],
-                'price' => $item['price']
-            ]);
-
-            //Mise à jours de stock
-            $product = Product::find($item['id']);
-
-            if ($product->stock < $item['quantity']) {
-                return back()->with('error', 'Stock insuffisant pour ' . $item['name']);
+            if ($product->stock < $quantity) {
+                return back()->with('error', "Stock insuffisant pour {$product->name}");
             }
-            $product->stock = $product->stock - $item['quantity'];
-            $product->save();
 
+            $lines[] = ['product' => $product, 'quantity' => $quantity];
         }
 
+        DB::transaction(function () use ($lines, $request) {
+            $sale = Sale::create([
+                'client_id' => $request->client_id,
+                'total' => 0,
+                'payement_method' => $request->payement_method,
+            ]);
 
+            $total = 0;
 
-        $sale->update([
-            'total' => $total
-        ]);
+            foreach ($lines as $line) {
+                $product = $line['product'];
+                $quantity = $line['quantity'];
+                $subtotal = $product->price * $quantity;
+                $total += $subtotal;
 
-        return redirect()->route('sales.index')
-            ->with('success', 'Vente enregistrée');
+                SaleItem::create([
+                    'sale_id' => $sale->id,
+                    'product_id' => $product->id,
+                    'quantity' => $quantity,
+                    'price' => $product->price,
+                ]);
+
+                $product->decrement('stock', $quantity);
+            }
+
+            $sale->update(['total' => $total]);
+        });
+
+        return redirect()->route('sales.index')->with('success', 'Vente enregistrée');
     }
+
 
     /**
      * Display the specified resource.
@@ -131,9 +139,10 @@ class SaleController extends Controller
         return redirect()->route('sales.index');
     }
 
-    public function invoice($id){
+    public function invoice($id)
+    {
         $sale = Sale::with('saleItems.product')->findOrFail($id);
         $pdf = Pdf::loadView('sales.invoice', compact('sale'));
-        return $pdf->stream('facture_'.$sale->id.'.pdf');
+        return $pdf->stream('facture_' . $sale->id . '.pdf');
     }
 }
